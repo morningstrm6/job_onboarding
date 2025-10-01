@@ -31,8 +31,11 @@ logger = logging.getLogger(__name__)
     ASK_EMAIL,
     ASK_WHATSAPP,
     ASK_TELE_ID,
+    ASK_ACCOUNT,   # new
+    ASK_IFSC,      # new
+    ASK_BANK,
     CONFIRM,
-) = range(7)
+) = range(10)
 
 # Env vars (must be set in runner or local .env)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -129,6 +132,22 @@ async def ask_whatsapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_tele_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tele = update.message.text.strip()
     context.user_data["collected"]["telegram_user"] = tele
+    
+async def ask_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    acct = update.message.text.strip()
+    context.user_data['collected']['account_number'] = acct
+    await update.message.reply_text("Please enter your bank IFSC code (e.g., HDFC0001234):")
+    return ASK_IFSC
+
+async def ask_ifsc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ifsc = update.message.text.strip().upper()
+    context.user_data['collected']['ifsc'] = ifsc
+    await update.message.reply_text("Please enter your Bank Name:")
+    return ASK_BANK
+
+async def ask_bank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    bank = update.message.text.strip()
+    context.user_data['collected']['bank_name'] = bank
     c = context.user_data["collected"]
     summary = (
         "Thanks — here's the summary of what you entered:\n\n"
@@ -138,6 +157,9 @@ async def ask_tele_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Email: {c.get('email')}\n"
         f"WhatsApp: {c.get('whatsapp')}\n"
         f"Telegram: {c.get('telegram_user')}\n\n"
+        f"Account Number: {c.get('account_number')}\n"
+        f"IFSC: {c.get('ifsc')}\n"
+        f"Bank Name: {c.get('bank_name')}\n\n"
         "Send 'confirm' to submit or 'cancel' to abort."
     )
     await update.message.reply_text(summary)
@@ -157,11 +179,28 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Save to Google Sheet (with header creation if needed)
     try:
         sheet = get_sheet()
-        header = ["Employee Code", "Name", "Gender", "Phone", "Email", "WhatsApp", "Telegram User", "Timestamp"]
+        header = [
+            "Employee Code", "Name", "Gender", "Phone", "Email",
+            "WhatsApp", "Telegram User",
+            "Account Number", "IFSC", "Bank Name",
+            "Timestamp"
+        ]
         existing = sheet.row_values(1)
         if not existing or existing[0] != "Employee Code":
             sheet.insert_row(header, index=1)
-        row = [c["employee_code"], c["name"], c["gender"], c["phone"], c["email"], c["whatsapp"], c["telegram_user"], c["created_at"]]
+        row = [
+            c.get('employee_code'),
+            c.get('name'),
+            c.get('gender'),
+            c.get('phone'),
+            c.get('email'),
+            c.get('whatsapp'),
+            c.get('telegram_user'),
+            c.get('account_number', ''),
+            c.get('ifsc', ''),
+            c.get('bank_name', ''),
+            c.get('created_at'),
+        ]
         sheet.append_row(row)
     except Exception:
         logger.exception("Failed to write to Google Sheet")
@@ -196,14 +235,18 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
     states={
-        ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
-        ASK_GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_gender)],
-        ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
-        ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email)],
-        ASK_WHATSAPP: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_whatsapp)],
-        ASK_TELE_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_tele_id)],
-        CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)],
+    ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
+    ASK_GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_gender)],
+    ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
+    ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email)],
+    ASK_WHATSAPP: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_whatsapp)],
+    ASK_TELE_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_tele_id)],
+    ASK_ACCOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_account)],
+    ASK_IFSC: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_ifsc)],
+    ASK_BANK: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_bank)],
+    CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)],
     },
+
     fallbacks=[CommandHandler("cancel", cancel)],
     allow_reentry=True,
 )
