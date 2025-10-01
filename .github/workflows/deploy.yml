@@ -7,39 +7,51 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  lint-test-deploy:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install flake8 pytest
+          pip install black flake8 pytest
 
+      # 4️⃣ Autoformat code with black
+      - name: Format code
+        run: |
+          black .
+
+      # 5️⃣ Lint code
       - name: Lint code
         run: |
           flake8 .
 
+      # 6️⃣ Run tests if present
       - name: Run tests
         run: |
           if [ -d "tests" ]; then
             pytest tests
           else
-            echo "No tests directory, skipping tests"
+            echo "No tests directory found, skipping tests"
           fi
 
+      # 7️⃣ Create deployment ZIP for Choreo
       - name: Create deployment artifact
         run: |
           zip -r bot_deploy.zip . -x '*.git*' '*.github*' '*.env*' '*.DS_Store'
 
+      # 8️⃣ Upload artifact (using latest v4)
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
