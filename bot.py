@@ -19,7 +19,8 @@ load_dotenv()
 
 # Logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,9 @@ def get_sheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = Credentials.from_service_account_file(GOOGLE_CREDS_JSON_PATH, scopes=scopes)
+    creds = Credentials.from_service_account_file(
+        GOOGLE_CREDS_JSON_PATH, scopes=scopes
+    )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(SPREADSHEET_ID)
     return sh.sheet1
@@ -93,8 +96,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     context.user_data["collected"]["name"] = name
-    kb = ReplyKeyboardMarkup([["Male", "Female", "Other"]], one_time_keyboard=True, resize_keyboard=True)
-    await update.message.reply_text("What's your gender?", reply_markup=kb)
+    kb = ReplyKeyboardMarkup(
+        [["Male", "Female", "Other"]],
+        one_time_keyboard=True,
+        resize_keyboard=True
+    )
+    await update.message.reply_text(
+        "What's your gender?", reply_markup=kb
+    )
     return ASK_GENDER
 
 async def ask_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,7 +118,10 @@ async def ask_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
     if not is_valid_phone(phone):
-        await update.message.reply_text("That doesn't look like a valid phone number. Please send digits (e.g. 9876543210).")
+        await update.message.reply_text(
+            "That doesn't look like a valid phone number. "
+            "Please send digits (e.g. 9876543210)."
+        )
         return ASK_PHONE
     context.user_data["collected"]["phone"] = phone
     await update.message.reply_text("Please enter your Email address:")
@@ -118,7 +130,9 @@ async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     email = update.message.text.strip()
     context.user_data["collected"]["email"] = email
-    await update.message.reply_text("Please enter your WhatsApp Number (or type 'same' if it's same as phone):")
+    await update.message.reply_text(
+        "Please enter your WhatsApp Number (or type 'same' if it's same as phone):"
+    )
     return ASK_WHATSAPP
 
 async def ask_whatsapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -126,17 +140,22 @@ async def ask_whatsapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if whats.lower() == "same":
         whats = context.user_data["collected"].get("phone", "")
     context.user_data["collected"]["whatsapp"] = whats
-    await update.message.reply_text("Please send your Telegram UserId (or username). Example: @username or numeric id:")
+    await update.message.reply_text(
+        "Please send your Telegram UserId (or username). "
+        "Example: @username or numeric id:"
+    )
     return ASK_TELE_ID
 
 async def ask_tele_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tele = update.message.text.strip()
     context.user_data["collected"]["telegram_user"] = tele
-    
+
 async def ask_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     acct = update.message.text.strip()
     context.user_data['collected']['account_number'] = acct
-    await update.message.reply_text("Please enter your bank IFSC code (e.g., HDFC0001234):")
+    await update.message.reply_text(
+        "Please enter your bank IFSC code (e.g., HDFC0001234):"
+    )
     return ASK_IFSC
 
 async def ask_ifsc(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -168,7 +187,9 @@ async def ask_bank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = update.message.text.strip().lower()
     if txt not in ("confirm", "yes"):
-        await update.message.reply_text("Onboarding canceled. If you'd like to start again, send /start.")
+        await update.message.reply_text(
+            "Onboarding canceled. If you'd like to start again, send /start."
+        )
         return ConversationHandler.END
 
     c = context.user_data["collected"]
@@ -204,30 +225,48 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sheet.append_row(row)
     except Exception:
         logger.exception("Failed to write to Google Sheet")
-        await update.message.reply_text("Sorry — there was an error saving your details. Please try again later.")
+        await update.message.reply_text(
+            "Sorry — there was an error saving your details. "
+            "Please try again later."
+        )
         return ConversationHandler.END
 
-    hr_link = f"https://t.me/{HR_TELEGRAM_USERNAME}" if HR_TELEGRAM_USERNAME else "HR contact not configured."
-    await update.message.reply_text(f"Your Employee Code: *{emp_code}*", parse_mode="Markdown")
+    hr_link = (
+        f"https://t.me/{HR_TELEGRAM_USERNAME}"
+        if HR_TELEGRAM_USERNAME else "HR contact not configured."
+    )
+    await update.message.reply_text(
+        f"Your Employee Code: *{emp_code}*", parse_mode="Markdown"
+    )
     if ONBOARDING_IMAGE_URL:
         try:
             await update.message.reply_photo(photo=ONBOARDING_IMAGE_URL)
         except Exception:
-            await update.message.reply_text("(Could not send image — please contact HR.)")
+            await update.message.reply_text(
+                "(Could not send image — please contact HR.)"
+            )
     instruction = (
         "**Next step — share your Employee Code with HR**\n\n"
         "Please share your *Employee Code* with HR to complete the onboarding process. "
-        "Once HR confirms the code, your onboarding will be finalized and you will receive further instructions and access details."
+        "Once HR confirms the code, your onboarding will be finalized and you will "
+        "receive further instructions and access details."
     )
     await update.message.reply_text(instruction, parse_mode="Markdown")
     if HR_TELEGRAM_USERNAME:
-        await update.message.reply_text(f"Contact HR here: {hr_link}\n\nThank you — your details have been submitted.")
+        await update.message.reply_text(
+            f"Contact HR here: {hr_link}\n\nThank you — your details have been submitted."
+        )
     else:
-        await update.message.reply_text("HR contact is not configured. Please contact your HR team directly.")
+        await update.message.reply_text(
+            "HR contact is not configured. Please contact your HR team directly."
+        )
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Onboarding canceled. If you'd like to start again, send /start.", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text(
+        "Onboarding canceled. If you'd like to start again, send /start.",
+        reply_markup=ReplyKeyboardRemove()
+    )
     return ConversationHandler.END
 
 # Build app
@@ -235,16 +274,16 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
     states={
-    ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
-    ASK_GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_gender)],
-    ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
-    ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email)],
-    ASK_WHATSAPP: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_whatsapp)],
-    ASK_TELE_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_tele_id)],
-    ASK_ACCOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_account)],
-    ASK_IFSC: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_ifsc)],
-    ASK_BANK: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_bank)],
-    CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)],
+        ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
+        ASK_GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_gender)],
+        ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
+        ASK_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_email)],
+        ASK_WHATSAPP: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_whatsapp)],
+        ASK_TELE_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_tele_id)],
+        ASK_ACCOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_account)],
+        ASK_IFSC: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_ifsc)],
+        ASK_BANK: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_bank)],
+        CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)],
     },
 
     fallbacks=[CommandHandler("cancel", cancel)],
