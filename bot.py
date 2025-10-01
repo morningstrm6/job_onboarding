@@ -59,7 +59,7 @@ if not GOOGLE_CREDS_JSON_CONTENT:
 # Write service account content to a temp file
 GOOGLE_CREDS_JSON_PATH = "/tmp/service_account.json"
 with open(GOOGLE_CREDS_JSON_PATH, "w") as f:
-    f.write(GOOGLE_CREDS_JSON_CONTENT)
+    f.write(GOOGLE_CREDS_JSON_JSON_CONTENT)
 
 # Google Sheets helper
 def get_sheet():
@@ -284,7 +284,6 @@ conv_handler = ConversationHandler(
         ASK_BANK: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_bank)],
         CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm)],
     },
-
     fallbacks=[CommandHandler("cancel", cancel)],
     allow_reentry=True,
 )
