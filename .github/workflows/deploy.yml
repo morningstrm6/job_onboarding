@@ -30,13 +30,13 @@ jobs:
       # 4️⃣ Autoformat code with black
       - name: Autoformat code with black
         run: |
-          black .
+          black --line-length 120 .
 
       # 5️⃣ Lint code with flake8 (ignore long lines up to 88)
       - name: Lint code
         run: |
           echo "[flake8]" > .flake8
-          echo "max-line-length = 88" >> .flake8
+          echo "max-line-length = 120" >> .flake8
           echo "ignore = E203, W503" >> .flake8
           flake8 .
 
