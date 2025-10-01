@@ -32,18 +32,20 @@ logger = logging.getLogger(__name__)
     ASK_EMAIL,
     ASK_WHATSAPP,
     ASK_TELE_ID,
-    ASK_ACCOUNT,   # new
-    ASK_IFSC,      # new
+    ASK_ACCOUNT,
+    ASK_IFSC,
     ASK_BANK,
     CONFIRM,
 ) = range(10)
 
-# Env vars (must be set in runner or local .env)
+# Env vars (must be set in runner or .env)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 HR_TELEGRAM_USERNAME = os.getenv("HR_TELEGRAM_USERNAME")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 ONBOARDING_IMAGE_URL = os.getenv("ONBOARDING_IMAGE_URL")
 GOOGLE_CREDS_JSON_CONTENT = os.getenv("GOOGLE_CREDS_JSON_CONTENT")
+APP_URL = os.getenv("APP_URL")  # Choreo app URL
+PORT = int(os.getenv("PORT", 8080))
 
 # Safety checks
 if not BOT_TOKEN:
@@ -55,6 +57,9 @@ if not SPREADSHEET_ID:
 if not GOOGLE_CREDS_JSON_CONTENT:
     logger.error("GOOGLE_CREDS_JSON_CONTENT is not set. Exiting.")
     raise SystemExit("GOOGLE_CREDS_JSON_CONTENT not set")
+if not APP_URL:
+    logger.error("APP_URL is not set. Exiting.")
+    raise SystemExit("APP_URL not set")
 
 # Write service account content to a temp file
 GOOGLE_CREDS_JSON_PATH = "/tmp/service_account.json"
@@ -84,7 +89,8 @@ def is_valid_phone(phone: str) -> bool:
     digits = "".join([c for c in phone if c.isdigit()])
     return len(digits) >= 7
 
-# Handlers
+# --- Handlers ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["collected"] = {}
     await update.message.reply_text(
@@ -119,8 +125,7 @@ async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
     if not is_valid_phone(phone):
         await update.message.reply_text(
-            "That doesn't look like a valid phone number. "
-            "Please send digits (e.g. 9876543210)."
+            "That doesn't look like a valid phone number. Please send digits (e.g. 9876543210)."
         )
         return ASK_PHONE
     context.user_data["collected"]["phone"] = phone
@@ -141,21 +146,20 @@ async def ask_whatsapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         whats = context.user_data["collected"].get("phone", "")
     context.user_data["collected"]["whatsapp"] = whats
     await update.message.reply_text(
-        "Please send your Telegram UserId (or username). "
-        "Example: @username or numeric id:"
+        "Please send your Telegram UserId (or username). Example: @username or numeric id:"
     )
     return ASK_TELE_ID
 
 async def ask_tele_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tele = update.message.text.strip()
     context.user_data["collected"]["telegram_user"] = tele
+    await update.message.reply_text("Please enter your Bank Account Number:")
+    return ASK_ACCOUNT
 
 async def ask_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     acct = update.message.text.strip()
     context.user_data['collected']['account_number'] = acct
-    await update.message.reply_text(
-        "Please enter your bank IFSC code (e.g., HDFC0001234):"
-    )
+    await update.message.reply_text("Please enter your bank IFSC code (e.g., HDFC0001234):")
     return ASK_IFSC
 
 async def ask_ifsc(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,14 +201,12 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c["employee_code"] = emp_code
     c["created_at"] = datetime.utcnow().isoformat()
 
-    # Save to Google Sheet (with header creation if needed)
+    # Save to Google Sheet
     try:
         sheet = get_sheet()
         header = [
             "Employee Code", "Name", "Gender", "Phone", "Email",
-            "WhatsApp", "Telegram User",
-            "Account Number", "IFSC", "Bank Name",
-            "Timestamp"
+            "WhatsApp", "Telegram User", "Account Number", "IFSC", "Bank Name", "Timestamp"
         ]
         existing = sheet.row_values(1)
         if not existing or existing[0] != "Employee Code":
@@ -226,40 +228,26 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         logger.exception("Failed to write to Google Sheet")
         await update.message.reply_text(
-            "Sorry — there was an error saving your details. "
-            "Please try again later."
+            "Sorry — there was an error saving your details. Please try again later."
         )
         return ConversationHandler.END
 
-    hr_link = (
-        f"https://t.me/{HR_TELEGRAM_USERNAME}"
-        if HR_TELEGRAM_USERNAME else "HR contact not configured."
-    )
-    await update.message.reply_text(
-        f"Your Employee Code: *{emp_code}*", parse_mode="Markdown"
-    )
+    hr_link = f"https://t.me/{HR_TELEGRAM_USERNAME}" if HR_TELEGRAM_USERNAME else "HR contact not configured."
+    await update.message.reply_text(f"Your Employee Code: *{emp_code}*", parse_mode="Markdown")
     if ONBOARDING_IMAGE_URL:
         try:
             await update.message.reply_photo(photo=ONBOARDING_IMAGE_URL)
         except Exception:
-            await update.message.reply_text(
-                "(Could not send image — please contact HR.)"
-            )
+            await update.message.reply_text("(Could not send image — please contact HR.)")
     instruction = (
         "**Next step — share your Employee Code with HR**\n\n"
-        "Please share your *Employee Code* with HR to complete the onboarding process. "
-        "Once HR confirms the code, your onboarding will be finalized and you will "
-        "receive further instructions and access details."
+        "Please share your *Employee Code* with HR to complete the onboarding process."
     )
     await update.message.reply_text(instruction, parse_mode="Markdown")
     if HR_TELEGRAM_USERNAME:
-        await update.message.reply_text(
-            f"Contact HR here: {hr_link}\n\nThank you — your details have been submitted."
-        )
+        await update.message.reply_text(f"Contact HR here: {hr_link}\n\nThank you — your details have been submitted.")
     else:
-        await update.message.reply_text(
-            "HR contact is not configured. Please contact your HR team directly."
-        )
+        await update.message.reply_text("HR contact is not configured. Please contact your HR team directly.")
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,7 +256,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove()
     )
     return ConversationHandler.END
-# Build app
+
+# --- Setup App ---
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
@@ -289,6 +278,14 @@ conv_handler = ConversationHandler(
 )
 app.add_handler(conv_handler)
 
+# --- Webhook Mode for Choreo ---
 if __name__ == "__main__":
-    logger.info("Bot started in polling mode...")
-    app.run_polling()
+    logger.info("Bot started in webhook mode...")
+    WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+    WEBHOOK_URL = f"{APP_URL}{WEBHOOK_PATH}"
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL,
+        webhook_path=WEBHOOK_PATH,
+    )
