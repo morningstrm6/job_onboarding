@@ -40,6 +40,9 @@ HR_TELEGRAM_USERNAME = os.getenv("HR_TELEGRAM_USER_ID")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 ONBOARDING_IMAGE_URL = os.getenv("ONBOARDING_IMAGE_URL")
 GOOGLE_CREDS_JSON_CONTENT = os.getenv("GOOGLE_CREDS_JSON_CONTENT")
+APP_URL = os.getenv("APP_URL")  # Choreo endpoint URL
+PORT = int(os.environ.get("PORT", 8080))  # Choreo usually sets this
+
 
 # Safety checks
 if not BOT_TOKEN or not SPREADSHEET_ID or not GOOGLE_CREDS_JSON_CONTENT:
@@ -203,5 +206,16 @@ conv_handler = ConversationHandler(
 app.add_handler(conv_handler)
 
 if __name__ == "__main__":
-    logger.info("Bot started in polling mode...")
-    app.run_polling()
+    logger.info("Starting bot in webhook mode...")
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Add your handlers here (ConversationHandler etc.)
+    app.add_handler(conv_handler)
+
+    # Start webhook
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=BOT_TOKEN,
+        webhook_url=f"{APP_URL}/{BOT_TOKEN}"
+    )
