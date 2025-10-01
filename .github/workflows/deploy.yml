@@ -41,7 +41,7 @@ jobs:
           zip -r bot_deploy.zip . -x '*.git*' '*.github*' '*.env*' '*.DS_Store'
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bot_deploy
           path: bot_deploy.zip
