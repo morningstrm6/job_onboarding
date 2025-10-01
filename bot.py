@@ -268,7 +268,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove()
     )
     return ConversationHandler.END
-
 # Build app
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 conv_handler = ConversationHandler(
